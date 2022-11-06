@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
-from forms import UserAddForm, LoginForm, MessageForm
+from forms import UserAddForm, LoginForm, MessageForm, EditForm
 from models import db, connect_db, User, Message
 
 CURR_USER_KEY = "curr_user"
@@ -114,6 +114,9 @@ def logout():
     """Handle logout of user."""
 
     # IMPLEMENT THIS
+    do_logout()
+    flash(f"Goodbye! You have logged out.")
+    return redirect("/")
 
 
 ##############################################################################
@@ -212,6 +215,28 @@ def profile():
     """Update profile for current user."""
 
     # IMPLEMENT THIS
+    if not g.user:
+        flash("Wrong user.", "danger")
+        return redirect("/")
+
+    user = g.user
+    form = EditForm(obj=user)
+
+    if form.validate_on_submit():
+        if User.authenticate(user.username, form.password.data):
+            user.username = form.username.data
+            user.email = form.email.data
+            user.image_url = form.image_url.data
+            user.header_image_url = form.header_image_url.data
+            user.bio = form.bio.data
+            user.location = form.location.data
+
+            db.session.commit()
+            return redirect(f"/users/{user.id}")
+
+        flash("Not authorized.", "danger")
+
+    return render_template('users/edit.html', user=user, user_id=user.id, form=form)
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -291,12 +316,19 @@ def homepage():
     - logged in: 100 most recent messages of followed_users
     """
 
+    user = g.user
     if g.user:
-        messages = (Message
-                    .query
-                    .order_by(Message.timestamp.desc())
-                    .limit(100)
-                    .all())
+
+        all_messages = (Message
+                        .query
+                        .order_by(Message.timestamp.desc())
+                        .all())
+
+        messages = []
+        for message in all_messages:
+            if User.is_following(user, message.user):
+                messages.append(message)
+        # User.is_following()
 
         return render_template('home.html', messages=messages)
 
