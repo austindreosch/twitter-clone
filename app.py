@@ -330,6 +330,9 @@ def homepage():
                 messages.append(message)
         # User.is_following()
 
+        # messages.append(
+        #     Message.query.filter(message.id == user.id)
+        # )
         return render_template('home.html', messages=messages)
 
     else:
