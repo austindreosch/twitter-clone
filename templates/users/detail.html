@@ -16,7 +16,7 @@
       <div class="col-9">
         <ul class="user-stats nav nav-pills">
           <li class="stat">
-            <p class="small">Messages</p>
+            <p class="small">Warbles</p>
             <h4>
               <a href="/users/{{ user.id }}">{{ user.messages | length }}</a>
             </h4>
@@ -37,10 +37,17 @@
               >
             </h4>
           </li>
+          <!-- Mine -->
+          {% if g.user.id == user.id %}
           <li class="stat">
             <p class="small">Likes</p>
-            <h4>TBD</h4>
+            <h4>
+              <a href="/users/{{ user.id }}/likes">
+                {{ user.likes | length }}
+              </a>
+            </h4>
           </li>
+          {% endif %}
           <div class="ml-auto">
             {% if g.user.id == user.id %}
             <a href="/users/profile" class="btn btn-outline-secondary"

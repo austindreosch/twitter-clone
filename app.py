@@ -18,7 +18,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = False
-app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = True
+app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', "it's a secret")
 toolbar = DebugToolbarExtension(app)
 
@@ -153,7 +153,8 @@ def users_show(user_id):
                 .order_by(Message.timestamp.desc())
                 .limit(100)
                 .all())
-    return render_template('users/show.html', user=user, messages=messages)
+    likes = [message.id for message in g.user.likes]
+    return render_template('users/show.html', user=user, messages=messages, likes=likes)
 
 
 @app.route('/users/<int:user_id>/following')
@@ -180,6 +181,19 @@ def users_followers(user_id):
     return render_template('users/followers.html', user=user)
 
 
+@app.route('/users/<int:user_id>/likes')
+def show_likes(user_id):
+
+    user = User.query.get_or_404(user_id)
+
+    # snagging messages in order from the database;
+    # user.messages won't be in order by default
+
+    likes = user.likes
+
+    return render_template('users/likes.html', user=user, likes=likes)
+
+
 @app.route('/users/follow/<int:follow_id>', methods=['POST'])
 def add_follow(follow_id):
     """Add a follow for the currently-logged-in user."""
@@ -193,6 +207,39 @@ def add_follow(follow_id):
     db.session.commit()
 
     return redirect(f"/users/{g.user.id}/following")
+
+
+@app.route('/users/add_like/<int:message_id>', methods=['POST'])
+def add_like(message_id):
+
+    message = Message.query.get_or_404(message_id)
+
+    likes = g.user.likes
+
+    if message in likes:
+        g.user.likes = [like for like in likes if like != message]
+    else:
+        g.user.likes.append(message)
+
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+# @app.route('/users/remove_like/<int:message_id>', methods=['POST'])
+# def remove_like(message_id):
+
+#     message = Message.query.get_or_404(message_id)
+
+#     likes = g.user.likes
+
+#     if message in likes:
+#         g.user.likes = [like for like in likes if like != message]
+#     else:
+#         g.user.likes.append(message)
+
+#     db.session.commit()
+
+#     return redirect("/users/<int:user_id>/likes")
 
 
 @app.route('/users/stop-following/<int:follow_id>', methods=['POST'])
@@ -317,6 +364,7 @@ def homepage():
     """
 
     user = g.user
+    user_for_bio = User.query.get_or_404(user.id)
     if g.user:
 
         all_messages = (Message
@@ -324,16 +372,22 @@ def homepage():
                         .order_by(Message.timestamp.desc())
                         .all())
 
+        # doing this because i know my tweets will be at top anyway
+        user_messages = (Message.query.filter_by(user_id=user.id))[::-1]
+
+        likes = [message.id for message in g.user.likes]
+
         messages = []
+
+        for message in user_messages:
+            print(message.text)
+            messages.append(message)
+
         for message in all_messages:
             if User.is_following(user, message.user):
                 messages.append(message)
-        # User.is_following()
 
-        # messages.append(
-        #     Message.query.filter(message.id == user.id)
-        # )
-        return render_template('home.html', messages=messages)
+        return render_template('home.html', messages=messages, likes=likes, user=user_for_bio)
 
     else:
         return render_template('home-anon.html')
@@ -346,7 +400,7 @@ def homepage():
 #
 # https://stackoverflow.com/questions/34066804/disabling-caching-in-flask
 
-@app.after_request
+@ app.after_request
 def add_header(req):
     """Add non-caching headers on every request."""
 
